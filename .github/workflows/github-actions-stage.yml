@@ -1,68 +1,89 @@
-name: Back End Pipeline Stage
+name: Front End Pipeline Stage
 
 on:
-    push:
-        branches:
-            - master
+  push:
+    branches:
+      - master
 
 jobs:
-    validateCode:
-        runs-on: ubuntu-latest
+  validateFrontEnd:
+    name: Validate Front End
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 18
-                  cache: 'npm'
+      - name: Enter FE directory
+        run: cd front-end
 
-            - name: Install Dependencies
-              run: npm ci
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
 
-            - name: Validate Code
-              run: npm run validateCode
+      - name: Install Dependencies
+        run: npm ci
 
-    buildPushGcr:
-        runs-on: ubuntu-latest
-        needs: validateCode
+      - name: Validate Code
+        run: npm run validateCode
 
-        env:
-            IMAGE_NAME: backend-pipeline
+  buildStatic:
+    runs-on: ubuntu-latest
+    name: Build Static
+    needs: validateFrontEnd
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v4
+    env:
+      REACT_APP_API_URL: ${{ secrets.API_URL_STAGE }}
+      PUBLIC_URL: .
 
-            - name: Google Cloud Auth
-              id: auth
-              uses: google-github-actions/auth@v2
-              with:
-                  credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-                  token_format: access_token
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-            - name: Set up Google Cloud SDK
-              uses: google-github-actions/setup-gcloud@v2
+      #            - name: Enter FE directory
+      #              run: cd front-end
 
-            - name: Docker Auth
-              uses: docker/login-action@v1
-              with:
-                  username: oauth2accesstoken
-                  password: '${{ steps.auth.outputs.access_token }}'
-                  registry: europe-central2-docker.pkg.dev
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
 
-            - name: Build Docker Image
-              run: docker build -t backend-pipeline .
+      - name: Install Dependencies
+        run: npm ci
 
-            - name: Push Docker Image to GAR
-              run: |-
-                  docker tag backend-pipeline europe-central2-docker.pkg.dev/${{ secrets.PROJECT_ID }}/backend-pipeline/backend-pipeline:${{ github.sha }}
-                  docker push europe-central2-docker.pkg.dev/${{ secrets.PROJECT_ID }}/backend-pipeline/backend-pipeline:${{ github.sha }}
+      - name: Build Static
+        run: npm run build
 
-            - name: Deploy to Cloud Run
-              run: gcloud run deploy backend-pipeline-stage --image europe-central2-docker.pkg.dev/${{ secrets.PROJECT_ID }}/backend-pipeline/backend-pipeline:${{ github.sha }} --region europe-central2
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: build/
 
-            - name: Show Output
-              run: echo ${{ steps.deploy.outputs.url }}
+  deployStaticToProd:
+    runs-on: ubuntu-latest
+    needs: buildStatic
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Google Cloud Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: build
+          path: build
+
+      - name: Deploy to GCS - Stage
+        run: gsutil -m rsync -d -r build/ gs://${{ secrets.BUCKET_NAME_ROOT }}-stage/
