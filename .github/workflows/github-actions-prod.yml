@@ -3,84 +3,87 @@ name: Front End Pipeline Prod
 on: workflow_dispatch
 
 jobs:
-    validateFrontEnd:
-        name: Validate Front End
-        runs-on: ubuntu-latest
+  validateFrontEnd:
+    name: Validate Front End
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./front-end
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-            - name: Enter FE directory
-              run: cd front-end
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: front-end/package-lock.json
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 18
-                  cache: 'npm'
+      - name: Install Dependencies
+        run: npm ci
 
-            - name: Install Dependencies
-              run: npm ci
+      - name: Validate Code
+        run: npm run validateCode
 
-            - name: Validate Code
-              run: npm run validateCode
+  buildStatic:
+    name: Build Static
+    needs: validateFrontEnd
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./front-end
 
-    buildStatic:
-        runs-on: ubuntu-latest
-        name: Build Static
-        needs: validateFrontEnd
+    env:
+      REACT_APP_API_URL: ${{ secrets.API_URL_PROD }}
+      PUBLIC_URL: .
 
-        env:
-            REACT_APP_API_URL: ${{ secrets.API_URL_PROD }}
-            PUBLIC_URL: .
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: front-end/package-lock.json
 
-#            - name: Enter FE directory
-#              run: cd front-end
+      - name: Install Dependencies
+        run: npm ci
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 18
-                  cache: 'npm'
+      - name: Build Static
+        run: npm run build
 
-            - name: Install Dependencies
-              run: npm ci
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: ./front-end/build
 
-            - name: Build Static
-              run: npm run build
+  deployStaticToProd:
+    name: Deploy Static To Prod
+    needs: buildStatic
+    runs-on: ubuntu-latest
 
-            - name: Upload Build Artifacts
-              uses: actions/upload-artifact@v2
-              with:
-                  name: build
-                  path: build/
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    deployStaticToProd:
-        runs-on: ubuntu-latest
-        needs: buildStatic
+      - name: Google Cloud Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v4
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-            - name: Google Cloud Auth
-              uses: google-github-actions/auth@v2
-              with:
-                  credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: build
+          path: build
 
-            - name: Set up Google Cloud SDK
-              uses: google-github-actions/setup-gcloud@v2
-
-            - name: Download Build Artifacts
-              uses: actions/download-artifact@v2
-              with:
-                  name: build
-                  path: build
-
-            - name: Deploy to GCS - Prod
-              run: gsutil -m rsync -d -r build/ gs://${{ secrets.BUCKET_NAME_ROOT }}-prod/
+      - name: Deploy to GCS - Prod
+        run: gsutil -m rsync -d -r build/ gs://${{ secrets.BUCKET_NAME_ROOT }}-prod/

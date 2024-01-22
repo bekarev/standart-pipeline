@@ -65,8 +65,8 @@ jobs:
           name: build
           path: ./front-end/build
 
-  deployStaticToProd:
-    name: Deploy Static To Prod
+  deployStaticToStage:
+    name: Deploy Static To Stage
     needs: buildStatic
     runs-on: ubuntu-latest
 
