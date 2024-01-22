@@ -9,13 +9,13 @@ jobs:
   validateFrontEnd:
     name: Validate Front End
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 'front-end'
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Enter FE directory
-        run: cd front-end
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -41,9 +41,6 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      #            - name: Enter FE directory
-      #              run: cd front-end
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
