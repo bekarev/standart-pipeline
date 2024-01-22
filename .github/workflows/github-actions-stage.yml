@@ -31,9 +31,12 @@ jobs:
         run: npm run validateCode
 
   buildStatic:
-    runs-on: ubuntu-latest
     name: Build Static
     needs: validateFrontEnd
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./front-end
 
     env:
       REACT_APP_API_URL: ${{ secrets.API_URL_STAGE }}
@@ -63,8 +66,9 @@ jobs:
           path: build/
 
   deployStaticToProd:
-    runs-on: ubuntu-latest
+    name: Deploy Static To Prod
     needs: buildStatic
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
