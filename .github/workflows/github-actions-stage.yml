@@ -1,10 +1,10 @@
 name: Pipeline Stage
 
 on:
-  push:
   pull_request:
     branches:
-      - master
+      - main
+    types: [closed]
 
 jobs:
   validateFrontEnd:
@@ -33,6 +33,7 @@ jobs:
 
   buildStatic:
     name: Build Front End Static Files
+    if: github.event.pull_request.merged == true
     needs: [ validateFrontEnd, validateBackEnd ]
     runs-on: ubuntu-latest
     defaults:
@@ -68,6 +69,7 @@ jobs:
 
   deployStaticToStage:
     name: Deploy Front End Static Files To Stage
+    if: github.event.pull_request.merged == true
     needs: buildStatic
     runs-on: ubuntu-latest
 
@@ -118,6 +120,7 @@ jobs:
 
   buildPushGcr:
     name: Build And Deploy Back End Image To Stage
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     needs: [ validateFrontEnd, validateBackEnd ]
     defaults:
