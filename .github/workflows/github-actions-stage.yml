@@ -1,6 +1,7 @@
 name: Pipeline Stage
 
 on:
+  push:
   pull_request:
     branches:
       - master
