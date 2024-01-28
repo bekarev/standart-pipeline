@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 
 export const useNote = () => {
-  // const { REACT_APP_API_URL } = process.env;
-  const REACT_APP_API_URL = 'https://backend-pipeline-stage-qqtetcnk7a-lm.a.run.app/';
+  const { REACT_APP_API_URL } = process.env;
   const [note, setNote] = useState(' Loading...');
 
   useEffect(() => {
